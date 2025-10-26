@@ -1,12 +1,18 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
+from datetime import datetime
+import uuid
+from botocore.exceptions import ClientError
+
 from database import create_todo_table, get_todo_table
 from models import TodoCreate, TodoUpdate, TodoResponse
-from decimal import Decimal
-from boto3.dynamodb.conditions import Key
 
-app = FastAPI(title="FAST API Todo API", version="1.0.0")
+app = FastAPI(
+    title="Todo API",
+    version="1.0.0",
+    description="FastAPI + DynamoDB で構築されたTODOアプリケーション"
+)
 
 # CORS設定
 app.add_middleware(
@@ -59,11 +65,13 @@ async def get_todos():
 # API 2: TODO作成
 @app.post("/todos", response_model=TodoResponse, status_code=201)
 async def create_todo(todo: TodoCreate):
-    """新しいTODOを作成"""
-    try:
-        import uuid
-        from datetime import datetime
+    """
+    新しいTODOを作成
 
+    - **title**: TODOのタイトル（必須）
+    - **description**: TODOの説明（任意）
+    """
+    try:
         table = get_todo_table()
 
         # 新しいTODOのデータを作成
@@ -84,29 +92,30 @@ async def create_todo(todo: TodoCreate):
 
         return item
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"TODO作成エラー: {str(e)}")
 
 # API 3: TODO更新
 @app.put("/todos/{todo_id}", response_model=TodoResponse)
 async def update_todo(todo_id: str, todo: TodoUpdate):
-    """TODOを更新"""
-    try:
-        from datetime import datetime
-        from botocore.exceptions import ClientError
+    """
+    TODOを更新（部分更新対応）
 
+    - **title**: TODOのタイトル（任意）
+    - **description**: TODOの説明（任意）
+    - **completed**: 完了状態（任意）
+    """
+    try:
         table = get_todo_table()
 
-        # 既存のTODOを取得
+        # 既存のTODOを確認
         try:
             response = table.get_item(Key={'id': todo_id})
             if 'Item' not in response:
-                raise HTTPException(status_code=404, detail="TODO not found")
-
-            existing_todo = response['Item']
+                raise HTTPException(status_code=404, detail="TODOが見つかりません")
         except ClientError:
-            raise HTTPException(status_code=404, detail="TODO not found")
+            raise HTTPException(status_code=404, detail="TODOが見つかりません")
 
-        # 更新するフィールドを設定
+        # 更新するフィールドを動的に構築
         update_expression = "SET updated_at = :updated_at"
         expression_values = {':updated_at': datetime.now().isoformat()}
 
@@ -134,24 +143,26 @@ async def update_todo(todo_id: str, todo: TodoUpdate):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"TODO更新エラー: {str(e)}")
 
 # API 4: TODO削除
 @app.delete("/todos/{todo_id}", status_code=204)
 async def delete_todo(todo_id: str):
-    """TODOを削除"""
-    try:
-        from botocore.exceptions import ClientError
+    """
+    TODOを削除
 
+    - **todo_id**: 削除するTODOのID
+    """
+    try:
         table = get_todo_table()
 
         # 既存のTODOを確認
         try:
             response = table.get_item(Key={'id': todo_id})
             if 'Item' not in response:
-                raise HTTPException(status_code=404, detail="TODO not found")
+                raise HTTPException(status_code=404, detail="TODOが見つかりません")
         except ClientError:
-            raise HTTPException(status_code=404, detail="TODO not found")
+            raise HTTPException(status_code=404, detail="TODOが見つかりません")
 
         # TODOを削除
         table.delete_item(Key={'id': todo_id})
@@ -160,4 +171,4 @@ async def delete_todo(todo_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"TODO削除エラー: {str(e)}")
