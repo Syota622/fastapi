@@ -28,14 +28,6 @@ app.add_middleware(
 async def startup_event():
     create_todo_table()
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to Todo API"}
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
 # API 1: TODO一覧取得
 @app.get("/todos", response_model=List[TodoResponse])
 async def get_todos():
