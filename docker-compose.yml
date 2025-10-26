@@ -20,6 +20,21 @@ services:
     depends_on:
       - dynamodb
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nextjs-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
   dynamodb:
     image: amazon/dynamodb-local:latest
     container_name: dynamodb-local
